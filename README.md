@@ -1,5 +1,8 @@
 # WWCP EEBUS
 
+[![CI](https://github.com/OpenChargingCloud/WWCP_EEBUS/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenChargingCloud/WWCP_EEBUS/actions/workflows/ci.yml)
+[![Nightly](https://github.com/OpenChargingCloud/WWCP_EEBUS/actions/workflows/nightly.yml/badge.svg)](https://github.com/OpenChargingCloud/WWCP_EEBUS/actions/workflows/nightly.yml)
+
 This software libraries will allow the communication between World Wide Charging Protocol (WWCP)
 entities and entities implementing the _EEBUS Protocol(s)_, which are defined by the
 [_EEBUS Initiative e.V._](https://www.eebus.org). EEBUS enables energy management relevant devices

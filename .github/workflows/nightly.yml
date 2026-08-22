@@ -1,0 +1,137 @@
+name: Nightly
+
+# The counterpart to ci.yml. That workflow gates every push and deliberately leaves the
+# "LocalNetwork" tests out, because they need multicast and a free port 5353 and a gate
+# whose red can also mean "the runner had no LAN" stops being read as a gate. Those tests
+# are still worth running — just not against a merge.
+#
+# Two things worth knowing about scheduled workflows: they only ever run on the default
+# branch, and GitHub disables them after 60 days without any repository activity. If this
+# stops reporting, that is the first thing to check.
+on:
+  schedule:
+    # 02:47 UTC. Not on the hour: GitHub's scheduler is busiest then and delays runs by
+    # tens of minutes. Also staggered against Hermod (02:17) and EEBUSConformanceTests
+    # (03:37), so a red morning can be read top-down: foundations, stack, test suite.
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  full-suite:
+    name: Full suite (${{ matrix.leg }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    # The same two-leg matrix as ci.yml: Debian 13 in a bare debian:13 container, and
+    # Windows. See ci.yml for why it is exactly these two — in short: production parity
+    # and its OpenSSL on one side, Schannel/CryptoAPI chain building under the SHIP mutual
+    # TLS handshake on the other.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+          - os: windows-latest
+            leg: windows-latest
+
+    steps:
+
+      # Before the checkouts, and for the same reasons as in ci.yml: the bare debian:13
+      # image has neither git nor the .NET runtime prerequisites setup-dotnet needs.
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata
+          git config --global --add safe.directory '*'
+
+      # Same side-by-side checkout as ci.yml: WWCP_EEBUS.sln references
+      # ..\Hermod\Hermod\Hermod.csproj and ..\Styx\Styx\Styx.csproj — SIBLING directories —
+      # and there is no submodule for either.
+      - uses: actions/checkout@v7
+        with:
+          path: WWCP_EEBUS
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Hermod
+          path: Hermod
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Styx
+          path: Styx
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        working-directory: WWCP_EEBUS
+        run: dotnet build WWCP_EEBUS.sln --configuration Release
+
+      # The same set the gate runs (ci.yml excludes Category "LocalNetwork" too, so this is
+      # not a wider net any more). Repeating it here is still worth the minutes: it catches
+      # tests that only fail sometimes — SHIP and SPINE are full of protocol timing — and,
+      # because neither workflow pins Hermod or Styx, it notices a breaking change in their
+      # master on a day when nobody pushed to WWCP_EEBUS at all. Fatal: a red here is a
+      # real regression.
+      - name: Test (everything except the local network probes)
+        timeout-minutes: 60
+        working-directory: WWCP_EEBUS
+        run: dotnet test WWCP_EEBUS.sln --configuration Release --no-build --filter "TestCategory!=LocalNetwork" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=${{ matrix.leg }}" --results-directory artifacts
+
+      # The local network probes (Category "LocalNetwork"): SHIP mDNS discovery on
+      # 224.0.0.251:5353 and the SHIP WebSocket endpoint bound to a real interface.
+      # Informational on purpose — a hosted runner is not a normal LAN, and the Debian leg
+      # is a container on top of one. Multicast is not guaranteed, port 5353 may already be
+      # taken by the host resolver, and on the Windows leg the firewall drops inbound
+      # multicast by default. Failures here mean "the runner could not ask", which says
+      # nothing about our discovery code, so they must not be able to turn the night red.
+      #
+      # Read the numbers below for a trend instead. These two normally either both pass or
+      # both fail together, so one passing and one failing IS worth investigating — as is a
+      # leg that suddenly stops passing when it had been green for weeks.
+      - name: Local network probes (informational)
+        continue-on-error: true
+        timeout-minutes: 15
+        working-directory: WWCP_EEBUS
+        shell: bash
+        run: |
+          set +e
+          dotnet test WWCP_EEBUS.sln --configuration Release --no-build \
+            --filter "TestCategory=LocalNetwork" --logger "console;verbosity=normal" \
+            --logger "trx;LogFilePrefix=${{ matrix.leg }}-localnetwork" \
+            --results-directory artifacts 2>&1 | tee localnetwork.txt
+          {
+            echo "## Local network probes (informational, ${{ matrix.leg }})"
+            echo
+            echo "Network-dependent: failures here reflect runner multicast and port 5353,"
+            echo "not our discovery code."
+            echo
+            echo '```'
+            grep -E "Passed!|Failed!|Total tests|Passed:|Failed:" localnetwork.txt || tail -5 localnetwork.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      # Two .trx files per leg: the gated set and the local network probes. The step summary
+      # above reduces the probes to five counters, which is the right amount to read every
+      # morning but the wrong amount when a night looks odd — it cannot say WHICH probe
+      # failed or why. The probe .trx names it.
+      #
+      # continue-on-error on the probe step means it counts as successful here, so
+      # !cancelled() collects both files even on a night the probes went red.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.leg }}
+          path: WWCP_EEBUS/artifacts/*.trx

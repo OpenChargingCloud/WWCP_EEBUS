@@ -8,6 +8,9 @@
 
 # mstest test results
 TestResults
+
+# --results-directory of the CI test runs (ci.yml, nightly.yml)
+artifacts/
 */TestResult.xml
 
 ## Ignore Visual Studio temporary files, build results, and

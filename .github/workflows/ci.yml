@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Manual runs from the Actions tab ("Run workflow"), same as nightly.yml.
+  workflow_dispatch:
+
+concurrency:
+  # Pull requests: one run per branch, newest wins — a run against a head that has been
+  # superseded is answering a question nobody is asking any more.
+  #
+  # Pushes: one run per commit, and nothing cancels anything. A commit with no verdict is
+  # a hole nobody comes back to fill: the next commit contains it, so the code does get
+  # tested eventually, but once that run is red there is no longer any way to say which of
+  # the two commits did it.
+  #
+  # Keying the group on the SHA, rather than only turning cancel-in-progress off, is what
+  # makes that hold for more than two pushes: a group keeps at most one run *pending*, so
+  # a third push discards the second before it ever starts.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  build-and-test:
+    name: Build and test (${{ matrix.leg }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    # One leg per platform this stack is expected to work on:
+    #
+    #  * Debian 13, because that is what it runs on in production. GitHub offers no Debian
+    #    runner image, so this leg runs on an Ubuntu runner inside a debian:13 container.
+    #    Deliberately NOT the official .NET SDK image: that is still Debian-12-based with
+    #    OpenSSL 3.0, and this is the leg that has to answer what the SHIP handshake does
+    #    on the OpenSSL version production actually has.
+    #  * Windows, because SHIP carries its mutual TLS handshake over WebSockets and finds
+    #    its peers via mDNS — certificate chain building goes through Schannel and
+    #    CryptoAPI here, which behaves differently from OpenSSL, and the two disagree often
+    #    enough to be worth a leg each.
+    #
+    # fail-fast is off on purpose: "red on exactly one platform" is the most valuable
+    # signal this matrix produces, so one leg must not cancel the other.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+          - os: windows-latest
+            leg: windows-latest
+
+    steps:
+
+      # Before the checkouts. The bare debian:13 image has no git, and actions/checkout
+      # silently falls back to downloading a tarball through the REST API when it cannot
+      # find one — which works, but leaves three working trees with no .git and no way to
+      # tell later what was actually built. git is two megabytes; predictability is worth
+      # more.
+      #
+      # The rest are the .NET runtime prerequisites that setup-dotnet needs before it can
+      # install the SDK: curl for the dotnet-install script itself, ICU and tzdata for
+      # globalization, OpenSSL for crypto, ca-certificates for NuGet and git over HTTPS.
+      # Package names verified on Debian 13 (trixie).
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata
+          # Everything in this container runs as root while the workspace comes from the
+          # host, which git otherwise reads as dubious ownership and refuses to touch.
+          git config --global --add safe.directory '*'
+
+      # This repository cannot be built on its own: WWCP_EEBUS.sln pulls in
+      # ..\Hermod\Hermod\Hermod.csproj and ..\Styx\Styx\Styx.csproj — SIBLING directories —
+      # and there is no submodule for either. So all three repositories are checked out
+      # side by side, which reproduces the layout those relative paths assume. (Hermod in
+      # turn reaches for ..\..\Styx\Styx\Styx.csproj, which the same layout satisfies.)
+      #
+      # Note what this does not do: pin Hermod and Styx. EEBUSConformanceTests pins them
+      # through submodules and builds this stack against those pins; here we build against
+      # their master, so a breaking change down there turns this red without anything in
+      # WWCP_EEBUS having moved. That is the honest signal — it is what tells us the day
+      # a Hermod change breaks us, rather than weeks later when the pin is bumped — but it
+      # is a choice, not an accident.
+      - uses: actions/checkout@v7
+        with:
+          path: WWCP_EEBUS
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Hermod
+          path: Hermod
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Styx
+          path: Styx
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # WWCP_EEBUS_Adapter is deliberately not part of the solution: it is the only project
+      # that reaches for WWCP_Core, and building it here would mean checking out a fourth
+      # repository for code no test touches.
+      - name: Build
+        working-directory: WWCP_EEBUS
+        run: dotnet build WWCP_EEBUS.sln --configuration Release
+
+      # Everything except the local network probes — none of what is left touches the
+      # network beyond loopback. SHIP and SPINE are exercised in-process between two nodes
+      # we start ourselves, so a failure means our code broke, not that a runner had no
+      # multicast.
+      #
+      # The exclusion is by CATEGORY, not by namespace: only Category("LocalNetwork") is
+      # left out, which today is SHIPMDNSLiveTests (mDNS on 224.0.0.251:5353) and
+      # SHIPWebSocketEndpointTests (binding a real interface). Everything else in
+      # WWCP_EEBUS_SHIP_Tests — the handshake state machine, the message framing, the
+      # certificate handling — is as deterministic as the SPINE and use case tests and
+      # belongs in the gate. nightly.yml runs the two probes non-fatally.
+      - name: Test (everything except the local network probes)
+        timeout-minutes: 30
+        working-directory: WWCP_EEBUS
+        run: dotnet test WWCP_EEBUS.sln --configuration Release --no-build --filter "TestCategory!=LocalNetwork" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=${{ matrix.leg }}" --results-directory artifacts
+
+      # The console log answers "did it pass" and almost nothing else: finding the one red
+      # case means pulling the whole step log and grepping it, and a skip reason never
+      # reaches the console at normal verbosity at all. TRX keeps both per test: outcome,
+      # duration, error message, stack trace and the Assert.Ignore reason. It also survives
+      # the run — `gh run download` gets structured results where the log view needs a
+      # signed-in browser session.
+      #
+      # LogFilePrefix, not LogFileName: the solution holds three test projects, and a fixed
+      # file name makes all three write the same .trx — the last one to finish silently wins
+      # and the other two results are gone. The prefix keeps the leg readable in the file
+      # name and lets VSTest disambiguate the rest.
+      #
+      # !cancelled() rather than success(): a red run is when these files matter most, so
+      # uploading only on green would discard the evidence in exactly that case. A build
+      # that fails before the test step leaves no .trx, which upload-artifact reports as a
+      # warning rather than a second failure — the compile error is the finding there.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.leg }}
+          path: WWCP_EEBUS/artifacts/*.trx
