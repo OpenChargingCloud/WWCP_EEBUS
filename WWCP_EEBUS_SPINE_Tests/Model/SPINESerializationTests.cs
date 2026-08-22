@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP EEBUS <https://github.com/OpenChargingCloud/WWCP_EEBUS>
  *
@@ -58,6 +58,31 @@ namespace cloud.charging.open.protocols.EEBUS.SPINE.tests
                 = "It holds an empty list in the form the EEBUS JSON transformation of SHIP produces, \"{}\". " +
                   "We read that (see EmptyList_MayArriveAsTheEmptyObject) and write the ordinary \"[]\" back, " +
                   "which is the same list and not the same characters."
+
+        };
+
+        /// <summary>
+        /// Recorded datagrams which deliberately carry a member that no implementation
+        /// models, with the reason. Unlike the deviations above these cannot be read at
+        /// all under the strict settings - that is the whole point of them - so they are
+        /// excluded from the roundtrip rather than from the comparison.
+        ///
+        /// The distinction matters: an unknown member is a hole in the model and has to
+        /// stay a failure. It is only not one when the datagram was written to contain a
+        /// member nobody defines.
+        /// </summary>
+        private static readonly Dictionary<String, String> goldenDatagramsWithDeliberatelyUnknownMembers = new (StringComparer.Ordinal) {
+
+            [ "rts001_discovery_reply_arbitrary_type.json" ]
+                = "It carries \"notify\" under possibleOperations, which neither SPINE nor spine-go's own " +
+                  "PossibleOperationsType defines - that type has \"read\" and \"write\" and nothing else. " +
+                  "The fixture exists to show that a receiver tolerates an unknown member, so refusing to " +
+                  "read it is this model behaving correctly on data which was never meant to roundtrip.",
+
+            [ "rts002_discovery_reply_unknown_type.json" ]
+                = "The same, for an unknown featureType. Both files arrived with spine-go 261abb7, " +
+                  "\"fix: tolerate unknown featureType in discovery reply\", and both are negative " +
+                  "fixtures by name: arbitrary_type and unknown_type."
 
         };
 
@@ -396,7 +421,8 @@ namespace cloud.charging.open.protocols.EEBUS.SPINE.tests
                     }
                     catch (JsonSerializationException e)
                     {
-                        problems.Add($"{Path.GetFileName(file)}: {e.Message}");
+                        if (!goldenDatagramsWithDeliberatelyUnknownMembers.ContainsKey(Path.GetFileName(file)))
+                            problems.Add($"{Path.GetFileName(file)}: {e.Message}");
                     }
 
                 }
