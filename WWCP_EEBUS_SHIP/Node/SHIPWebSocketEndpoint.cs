@@ -250,7 +250,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         #region (private) Server event handlers
 
         private async Task OnNewWebSocketConnection(DateTimeOffset             Timestamp,
-                                                    AWebSocketServer           Server,
+                                                    AWebSocketEndpoint         Server,
                                                     WebSocketServerConnection  NewConnection,
                                                     IEnumerable<String>        SharedSubprotocols,
                                                     String?                    SelectedSubprotocol,
@@ -282,7 +282,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         }
 
         private async Task OnServerBinaryMessage(DateTimeOffset             Timestamp,
-                                                 AWebSocketServer           Server,
+                                                 AWebSocketEndpoint         Server,
                                                  WebSocketServerConnection  Connection,
                                                  WebSocketFrame             Frame,
                                                  EventTracking_Id           EventTrackingId,
@@ -296,7 +296,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         }
 
         private Task OnServerCloseMessage(DateTimeOffset             Timestamp,
-                                          AWebSocketServer           Server,
+                                          AWebSocketEndpoint         Server,
                                           WebSocketServerConnection  Connection,
                                           WebSocketFrame             Frame,
                                           EventTracking_Id           EventTrackingId,
