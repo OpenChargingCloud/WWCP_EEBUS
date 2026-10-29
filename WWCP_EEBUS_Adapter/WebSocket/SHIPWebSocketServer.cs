@@ -293,7 +293,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
                                    TimeSpan?                                                       SlowNetworkSimulationDelay   = null,
 
                                    Func<X509Certificate2>?                                         ServerCertificateSelector    = null,
-                                   RemoteTLSClientCertificateValidationHandler<org.GraphDefined.Vanaheimr.Hermod.WebSocket.IWebSocketServer>?  ClientCertificateValidator   = null,
+                                   RemoteTLSClientCertificateValidationHandler<org.GraphDefined.Vanaheimr.Hermod.TCP.ITCPServer>?  ClientCertificateValidator   = null,
                                    LocalCertificateSelectionHandler?                               LocalCertificateSelector     = null,
                                    SslProtocols?                                                   AllowedTLSProtocols          = null,
                                    Boolean?                                                        ClientCertificateRequired    = null,
@@ -407,7 +407,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         #region (protected) ValidateTCPConnection         (LogTimestamp, Server, Connection, EventTrackingId, CancellationToken)
 
         private Task<ConnectionFilterResponse> ValidateTCPConnection(DateTimeOffset                LogTimestamp,
-                                                                     org.GraphDefined.Vanaheimr.Hermod.WebSocket.IWebSocketServer              Server,
+                                                                     org.GraphDefined.Vanaheimr.Hermod.WebSocket.AWebSocketEndpoint            Server,
                                                                      System.Net.Sockets.TcpClient  Connection,
                                                                      EventTracking_Id              EventTrackingId,
                                                                      CancellationToken             CancellationToken)
@@ -422,7 +422,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         #region (protected) ValidateWebSocketConnection   (LogTimestamp, Server, Connection, EventTrackingId, CancellationToken)
 
         private Task<HTTPResponse?> ValidateWebSocketConnection(DateTimeOffset             LogTimestamp,
-                                                                org.GraphDefined.Vanaheimr.Hermod.WebSocket.IWebSocketServer           Server,
+                                                                org.GraphDefined.Vanaheimr.Hermod.WebSocket.AWebSocketEndpoint         Server,
                                                                 WebSocketServerConnection  Connection,
                                                                 EventTracking_Id           EventTrackingId,
                                                                 CancellationToken          CancellationToken)
@@ -518,14 +518,8 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
 
         #region (protected) ProcessNewWebSocketConnection (LogTimestamp, Server, Connection, SharedSubprotocols, EventTrackingId, CancellationToken)
 
-        protected async Task ProcessNewWebSocketConnection(//DateTime                   LogTimestamp,
-                                                           //org.GraphDefined.Vanaheimr.Hermod.WebSocket.IWebSocketServer           Server,
-                                                           //WebSocketServerConnection  Connection,
-                                                           //IEnumerable<String>        SharedSubprotocols,
-                                                           //EventTracking_Id           EventTrackingId,
-                                                           //CancellationToken          CancellationToken)
-                                                           DateTimeOffset                     LogTimestamp,
-                                                           org.GraphDefined.Vanaheimr.Hermod.WebSocket.IWebSocketServer  Server,
+        protected async Task ProcessNewWebSocketConnection(DateTimeOffset                     LogTimestamp,
+                                                           org.GraphDefined.Vanaheimr.Hermod.WebSocket.AWebSocketEndpoint Server,
                                                            WebSocketServerConnection          Connection,
                                                            IEnumerable<String>                SharedSubprotocols,
                                                            String?                            SelectedSubprotocol,
@@ -706,7 +700,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         #region (protected) ProcessCloseMessage           (LogTimestamp, Server, Connection, Frame, EventTrackingId, StatusCode, Reason, CancellationToken)
 
         protected async Task ProcessCloseMessage(DateTimeOffset                    LogTimestamp,
-                                                 org.GraphDefined.Vanaheimr.Hermod.WebSocket.IWebSocketServer                  Server,
+                                                 org.GraphDefined.Vanaheimr.Hermod.WebSocket.AWebSocketEndpoint                Server,
                                                  WebSocketServerConnection         Connection,
                                                  WebSocketFrame                    Frame,
                                                  EventTracking_Id                  EventTrackingId,
