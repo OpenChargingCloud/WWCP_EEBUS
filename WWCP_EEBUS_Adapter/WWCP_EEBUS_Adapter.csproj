@@ -1,14 +1,23 @@
 <!--
-  PARKED PROJECT - not part of WWCP_EEBUS.sln!
+  The WWCP/OverlayNetworking integration layer: EEBUSAdapter (IN/OUT/FORWARD), AEEBUSNode,
+  and the OCPP-derived SHIP WebSocket client and server.
 
-  This project contains the WWCP/OverlayNetworking integration layer of the original
-  EEBUS prototype (EEBUSAdapter, AEEBUSNode, and the OCPP-derived SHIP WebSocket
-  client/server). It depends on WWCP_Core / WWCP_OverlayNetworking, which are not
-  available as siblings within the EEBUSConformanceTests working tree.
+  Part of WWCP_EEBUS.sln since WP-W1. From WP-W0 until then it was parked under "variant A"
+  - the SHIP/SPINE/UseCases core was built on Styx and Hermod alone, and this project was
+  left out of the solution because WWCP_Core was not available as a sibling. The cost of
+  that is worth recording: it meant the project was never compiled once in all that time,
+  and when it finally was, the first build found thirty errors in four families - three
+  missing interfaces, seven missing delegate types, a Version class that had moved, and
+  Hermod API drift - plus two defects no reviewer had spotted, because only a compiler
+  reaches them. See WORKPLAN.md of EEBUSConformanceTests, WP-W1.
 
-  The SHIP/SPINE/UseCases core is built standalone on top of Styx + Hermod only.
-  This code is kept as reference material and will be revived - against the finished
-  core - once the WWCP integration is on the agenda. See WORKPLAN.md of EEBUSConformanceTests, WP-W0.
+  The siblings it needs are WWCP_Core (WWCP_Core, WWCP_CoreData, WWCP_OverlayNetworking)
+  and WWCP_POI (WWCP_POI2). Both are submodules of EEBUSConformanceTests and are checked
+  out beside Hermod and Styx by the CI of that repository and of this one.
+
+  What this project still is not: exercised. No test touches it. It compiles, and that is
+  the whole of the claim - see the README beside this file for the two defects that are
+  known and deliberately left warning rather than silenced.
 -->
 <Project Sdk="Microsoft.NET.Sdk">
 

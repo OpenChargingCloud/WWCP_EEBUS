@@ -43,6 +43,19 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         public IEEBUSAdapter  EEBUS    { get; }
 
 
+        // These two always return nothing, and the compiler says so: CS0184 "the given
+        // expression is never of the provided type", plus CA2021 on the Cast. The lists
+        // they read hold OverlayWebSocketClient/OverlayWebSocketServer, while
+        // SHIPWebSocketClient/SHIPWebSocketServer descend from Hermod's WebSocketClient
+        // and WebSocketServer - two unrelated hierarchies, so the filter matches nothing
+        // whatever is registered.
+        //
+        // The fix is not here: it is that the SHIP client and server should descend from
+        // AOverlayWebSocketClient/AOverlayWebSocketServer, which is what a node in this
+        // overlay expects to be handed. That is a design change with no test to hold it
+        // down, so it is left for whoever takes the adapter further. The warnings are
+        // deliberately not suppressed - until that happens, the compiler saying this on
+        // every build is the most reliable record of it there is.
         public IEnumerable<SHIPWebSocketClient> EEBUSWebSocketClients
             => base.webSocketClients.Where(cl => cl is SHIPWebSocketClient).Cast<SHIPWebSocketClient>();
 
@@ -99,6 +112,13 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
 
 
 
+        // CS0108 on all four below: AOverlayNetworkingNode declares them too, and not as
+        // virtual, so these hide rather than override - a call through the base type gets
+        // the base answer and a call through this type gets the fixed key written here.
+        // "new" would silence the warning by asserting that the hiding is intended, and
+        // that is precisely what is not known: a hard-coded key in a node class reads far
+        // more like test scaffolding that outlived its test than like a decision. Left
+        // warning on purpose.
         public Byte[] GetEncryptionKey(NetworkingNode_Id  DestinationNodeId,
                                        UInt16?            KeyId   = null)
         {
@@ -126,11 +146,11 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
 
 
 
-        #region (virtual) HandleErrors(Module, Caller, ErrorResponse)
+        #region (override) HandleErrors(Module, Caller, ErrorResponse)
 
-        public virtual Task HandleErrors(String  Module,
-                                         String  Caller,
-                                         String  ErrorResponse)
+        public override Task HandleErrors(String  Module,
+                                          String  Caller,
+                                          String  ErrorResponse)
         {
 
             return Task.CompletedTask;
@@ -139,11 +159,11 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
 
         #endregion
 
-        #region (virtual) HandleErrors(Module, Caller, ExceptionOccured)
+        #region (override) HandleErrors(Module, Caller, ExceptionOccured)
 
-        public virtual Task HandleErrors(String     Module,
-                                         String     Caller,
-                                         Exception  ExceptionOccured)
+        public override Task HandleErrors(String     Module,
+                                          String     Caller,
+                                          Exception  ExceptionOccurred)
         {
 
             return Task.CompletedTask;

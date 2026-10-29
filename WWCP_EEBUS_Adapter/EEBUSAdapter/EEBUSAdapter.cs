@@ -210,11 +210,11 @@ namespace cloud.charging.open.protocols.EEBUS
                 reachability is not null)
             {
 
-                if (reachability.EEBUSWebSocketClient is not null)
-                    return await reachability.EEBUSWebSocketClient.SendJSONRequest(JSONRequestMessage);
+                if (reachability.EEBusWebSocketClient is not null)
+                    return await reachability.EEBusWebSocketClient.SendJSONRequest(JSONRequestMessage);
 
-                if (reachability.EEBUSWebSocketServer is not null)
-                    return await reachability.EEBUSWebSocketServer.SendJSONRequest(JSONRequestMessage);
+                if (reachability.EEBusWebSocketServer is not null)
+                    return await reachability.EEBusWebSocketServer.SendJSONRequest(JSONRequestMessage);
 
             }
 
@@ -345,11 +345,11 @@ namespace cloud.charging.open.protocols.EEBUS
                 reachability is not null)
             {
 
-                if (reachability.EEBUSWebSocketClient is not null)
-                    return await reachability.EEBUSWebSocketClient.SendJSONResponse(JSONResponseMessage);
+                if (reachability.EEBusWebSocketClient is not null)
+                    return await reachability.EEBusWebSocketClient.SendJSONResponse(JSONResponseMessage);
 
-                if (reachability.EEBUSWebSocketServer is not null)
-                    return await reachability.EEBUSWebSocketServer.SendJSONResponse(JSONResponseMessage);
+                if (reachability.EEBusWebSocketServer is not null)
+                    return await reachability.EEBusWebSocketServer.SendJSONResponse(JSONResponseMessage);
 
             }
 
@@ -368,11 +368,11 @@ namespace cloud.charging.open.protocols.EEBUS
                 reachability is not null)
             {
 
-                if (reachability.EEBUSWebSocketClient is not null)
-                    return await reachability.EEBUSWebSocketClient.SendJSONRequestError(JSONRequestErrorMessage);
+                if (reachability.EEBusWebSocketClient is not null)
+                    return await reachability.EEBusWebSocketClient.SendJSONRequestError(JSONRequestErrorMessage);
 
-                if (reachability.EEBUSWebSocketServer is not null)
-                    return await reachability.EEBUSWebSocketServer.SendJSONRequestError(JSONRequestErrorMessage);
+                if (reachability.EEBusWebSocketServer is not null)
+                    return await reachability.EEBusWebSocketServer.SendJSONRequestError(JSONRequestErrorMessage);
 
             }
 
@@ -391,11 +391,11 @@ namespace cloud.charging.open.protocols.EEBUS
                 reachability is not null)
             {
 
-                if (reachability.EEBUSWebSocketClient is not null)
-                    return await reachability.EEBUSWebSocketClient.SendJSONResponseError(JSONResponseErrorMessage);
+                if (reachability.EEBusWebSocketClient is not null)
+                    return await reachability.EEBusWebSocketClient.SendJSONResponseError(JSONResponseErrorMessage);
 
-                if (reachability.EEBUSWebSocketServer is not null)
-                    return await reachability.EEBUSWebSocketServer.SendJSONResponseError(JSONResponseErrorMessage);
+                if (reachability.EEBusWebSocketServer is not null)
+                    return await reachability.EEBusWebSocketServer.SendJSONResponseError(JSONResponseErrorMessage);
 
             }
 
@@ -415,11 +415,11 @@ namespace cloud.charging.open.protocols.EEBUS
                 reachability is not null)
             {
 
-                if (reachability.EEBUSWebSocketClient is not null)
-                    return await reachability.EEBUSWebSocketClient.SendBinaryRequest(BinaryRequestMessage);
+                if (reachability.EEBusWebSocketClient is not null)
+                    return await reachability.EEBusWebSocketClient.SendBinaryRequest(BinaryRequestMessage);
 
-                if (reachability.EEBUSWebSocketServer is not null)
-                    return await reachability.EEBUSWebSocketServer.SendBinaryRequest(BinaryRequestMessage);
+                if (reachability.EEBusWebSocketServer is not null)
+                    return await reachability.EEBusWebSocketServer.SendBinaryRequest(BinaryRequestMessage);
 
             }
 
@@ -550,11 +550,11 @@ namespace cloud.charging.open.protocols.EEBUS
                 reachability is not null)
             {
 
-                if (reachability.EEBUSWebSocketClient is not null)
-                    return await reachability.EEBUSWebSocketClient.SendBinaryResponse(BinaryResponseMessage);
+                if (reachability.EEBusWebSocketClient is not null)
+                    return await reachability.EEBusWebSocketClient.SendBinaryResponse(BinaryResponseMessage);
 
-                if (reachability.EEBUSWebSocketServer is not null)
-                    return await reachability.EEBUSWebSocketServer.SendBinaryResponse(BinaryResponseMessage);
+                if (reachability.EEBusWebSocketServer is not null)
+                    return await reachability.EEBusWebSocketServer.SendBinaryResponse(BinaryResponseMessage);
 
             }
 
@@ -699,8 +699,8 @@ namespace cloud.charging.open.protocols.EEBUS
 
                         }
 
-                    } while (reachability.EEBUSWebSocketClient is null &&
-                             reachability.EEBUSWebSocketServer is null);
+                    } while (reachability.EEBusWebSocketClient is null &&
+                             reachability.EEBusWebSocketServer is null);
 
                 }
 

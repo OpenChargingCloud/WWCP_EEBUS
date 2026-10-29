@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -101,13 +101,32 @@ jobs:
           repository: Vanaheimr/Styx
           path: Styx
 
+      # WWCP_Core (WWCP_Core, WWCP_CoreData, WWCP_OverlayNetworking) and WWCP_POI
+      # (WWCP_POI2) joined this layout together with WWCP_EEBUS_Adapter, which is in the
+      # solution now and is the one project that reaches for them. WWCP_Core in turn
+      # reaches for ..\..\WWCP_POI\WWCP_POI2\WWCP_POI2.csproj, so WWCP_POI is not
+      # optional once WWCP_Core is here.
+      #
+      # Unpinned, for the same reason Hermod and Styx are: EEBUSConformanceTests pins
+      # these through submodules, and this workflow deliberately builds against their
+      # master so that a breaking change down there turns this red at once.
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_Core
+          path: WWCP_Core
+
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_POI
+          path: WWCP_POI
+
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
-      # WWCP_EEBUS_Adapter is deliberately not part of the solution: it is the only project
-      # that reaches for WWCP_Core, and building it here would mean checking out a fourth
-      # repository for code no test touches.
+      # WWCP_EEBUS_Adapter is part of the solution since WP-W1 and is built here with
+      # everything else. What it is not is tested: no test touches it, so what this step
+      # says about it is that it compiles, and nothing more.
       - name: Build
         working-directory: WWCP_EEBUS
         run: dotnet build WWCP_EEBUS.sln --configuration Release

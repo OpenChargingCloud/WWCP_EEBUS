@@ -1,4 +1,4 @@
-name: Nightly
+﻿name: Nightly
 
 # The counterpart to ci.yml. That workflow gates every push and deliberately leaves the
 # "LocalNetwork" tests out, because they need multicast and a free port 5353 and a gate
@@ -68,6 +68,25 @@ jobs:
         with:
           repository: Vanaheimr/Styx
           path: Styx
+
+      # WWCP_Core (WWCP_Core, WWCP_CoreData, WWCP_OverlayNetworking) and WWCP_POI
+      # (WWCP_POI2) joined this layout together with WWCP_EEBUS_Adapter, which is in the
+      # solution now and is the one project that reaches for them. WWCP_Core in turn
+      # reaches for ..\..\WWCP_POI\WWCP_POI2\WWCP_POI2.csproj, so WWCP_POI is not
+      # optional once WWCP_Core is here.
+      #
+      # Unpinned, for the same reason Hermod and Styx are: EEBUSConformanceTests pins
+      # these through submodules, and this workflow deliberately builds against their
+      # master so that a breaking change down there turns this red at once.
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_Core
+          path: WWCP_Core
+
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_POI
+          path: WWCP_POI
 
       - uses: actions/setup-dotnet@v6
         with:

@@ -31,6 +31,7 @@ using org.GraphDefined.Vanaheimr.Hermod.DNS;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 using org.GraphDefined.Vanaheimr.Hermod.WebSocket;
 using org.GraphDefined.Vanaheimr.Hermod.Sockets;
+using org.GraphDefined.Vanaheimr.Hermod.TCP;
 
 using cloud.charging.open.protocols.WWCP.OverlayNetworking;
 using cloud.charging.open.protocols.WWCP.OverlayNetworking.WebSockets;
@@ -113,7 +114,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         /// The default HTTP server name.
         /// </summary>
         public  const           String                                                                                     DefaultHTTPServiceName
-            = $"GraphDefined EEBUS/SHIP {EEBUS.Version.String} Networking Node HTTP/WebSocket/JSON API";
+            = $"GraphDefined EEBUS/SHIP {SHIP.Version.String} Networking Node HTTP/WebSocket/JSON API";
 
         /// <summary>
         /// The default HTTP server TCP port.
@@ -123,7 +124,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         /// <summary>
         /// The default HTTP server URI prefix.
         /// </summary>
-        public static readonly  HTTPPath                                                                                   DefaultURLPrefix                  = HTTPPath.Parse("/" + EEBUS.Version.String);
+        public static readonly  HTTPPath                                                                                   DefaultURLPrefix                  = HTTPPath.Parse("/" + SHIP.Version.String);
 
         protected readonly      Dictionary<String, MethodInfo>                                                             incomingMessageProcessorsLookup   = [];
         protected readonly      ConcurrentDictionary<NetworkingNode_Id, Tuple<WebSocketServerConnection, DateTimeOffset>>  connectedNetworkingNodes          = [];
@@ -280,64 +281,73 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         /// 
         /// <param name="DNSClient">An optional DNS client to use.</param>
         /// <param name="AutoStart">Start the server immediately.</param>
-        public SHIPWebSocketServer(IEEBUSAdapter                                                    EEBUSAdapter,
+        public SHIPWebSocketServer(IEEBUSAdapter                                             EEBUSAdapter,
 
-                                   String?                                                         HTTPServiceName              = DefaultHTTPServiceName,
-                                   IIPAddress?                                                     IPAddress                    = null,
-                                   IPPort?                                                         TCPPort                      = null,
-                                   I18NString?                                                     Description                  = null,
+                                   String?                                                   HTTPServiceName              = DefaultHTTPServiceName,
+                                   IIPAddress?                                               IPAddress                    = null,
+                                   IPPort?                                                   TCPPort                      = null,
+                                   I18NString?                                               Description                  = null,
 
-                                   Boolean                                                         RequireAuthentication        = true,
-                                   Boolean                                                         DisableWebSocketPings        = false,
-                                   TimeSpan?                                                       WebSocketPingEvery           = null,
-                                   TimeSpan?                                                       SlowNetworkSimulationDelay   = null,
+                                   Boolean                                                   RequireAuthentication        = true,
+                                   Boolean                                                   DisableWebSocketPings        = false,
+                                   TimeSpan?                                                 WebSocketPingEvery           = null,
+                                   TimeSpan?                                                 SlowNetworkSimulationDelay   = null,
 
-                                   Func<X509Certificate2>?                                         ServerCertificateSelector    = null,
-                                   RemoteTLSClientCertificateValidationHandler<org.GraphDefined.Vanaheimr.Hermod.TCP.ITCPServer>?  ClientCertificateValidator   = null,
-                                   LocalCertificateSelectionHandler?                               LocalCertificateSelector     = null,
-                                   SslProtocols?                                                   AllowedTLSProtocols          = null,
-                                   Boolean?                                                        ClientCertificateRequired    = null,
-                                   Boolean?                                                        CheckCertificateRevocation   = null,
+                                   ServerCertificateSelectorDelegate?                        ServerCertificateSelector    = null,
+                                   RemoteTLSClientCertificateValidationHandler<ITCPServer>?  ClientCertificateValidator   = null,
+                                   LocalCertificateSelectionHandler?                         LocalCertificateSelector     = null,
+                                   SslProtocols?                                             AllowedTLSProtocols          = null,
+                                   Boolean?                                                  ClientCertificateRequired    = null,
+                                   Boolean?                                                  CheckCertificateRevocation   = null,
 
-                                   ServerThreadNameCreatorDelegate?                                ServerThreadNameCreator      = null,
-                                   ServerThreadPriorityDelegate?                                   ServerThreadPrioritySetter   = null,
-                                   Boolean?                                                        ServerThreadIsBackground     = null,
-                                   ConnectionIdBuilder?                                            ConnectionIdBuilder          = null,
-                                   TimeSpan?                                                       ConnectionTimeout            = null,
-                                   UInt32?                                                         MaxClientConnections         = null,
+                                   ConnectionIdBuilder?                                      ConnectionIdBuilder          = null,
+                                   TimeSpan?                                                 ReceiveTimeout               = null,
+                                   TimeSpan?                                                 SendTimeout                  = null,
+                                   UInt32?                                                   MaxClientConnections         = null,
 
-                                   DNSClient?                                                      DNSClient                    = null,
-                                   Boolean                                                         AutoStart                    = false)
+                                   IDNSClient?                                               DNSClient                    = null,
+                                   Boolean                                                   AutoStart                    = false)
 
-            : base(IPAddress,
-                   TCPPort         ?? IPPort.Parse(8000),
-                   HTTPServiceName ?? DefaultHTTPServiceName,
-                   Description,
+            // Named rather than positional, deliberately. This list used to be positional
+            // and slid silently out of alignment when the WebSocketServer constructor it
+            // calls changed shape: what the compiler then reported was argument 11 being a
+            // Func<X509Certificate2> where a UInt32? was wanted, which says nothing about
+            // the actual cause. Named arguments cannot drift that way - a parameter that
+            // goes away becomes an error naming it.
+            //
+            // Four parameters were dropped here because the base no longer has anywhere to
+            // put them: ServerThreadNameCreator, ServerThreadPrioritySetter and
+            // ServerThreadIsBackground (the delegate types still exist in Hermod.TCP, but
+            // a WebSocket server no longer runs a thread per connection), and
+            // ConnectionTimeout, whose job the pair of Receive/SendTimeout now does.
+            : base(IPAddress:                   IPAddress,
+                   HTTPPort:                    TCPPort         ?? IPPort.Parse(8000),
+                   HTTPServerName:              HTTPServiceName ?? DefaultHTTPServiceName,
+                   Description:                 Description,
 
-                   RequireAuthentication,
-                   [ "ship" ],
-                   null,
-                   DisableWebSocketPings,
-                   WebSocketPingEvery,
-                   SlowNetworkSimulationDelay,
+                   RequireAuthentication:       RequireAuthentication,
+                   SecWebSocketProtocols:       [ "ship" ],
+                   DisableWebSocketPings:       DisableWebSocketPings,
+                   WebSocketPingEvery:          WebSocketPingEvery,
+                   SlowNetworkSimulationDelay:  SlowNetworkSimulationDelay,
 
-                   ServerCertificateSelector,
-                   ClientCertificateValidator,
-                   LocalCertificateSelector,
-                   AllowedTLSProtocols,
-                   ClientCertificateRequired,
-                   CheckCertificateRevocation,
+                   ReceiveTimeout:              ReceiveTimeout,
+                   SendTimeout:                 SendTimeout,
 
-                   ServerThreadNameCreator,
-                   ServerThreadPrioritySetter,
-                   ServerThreadIsBackground,
-                   ConnectionIdBuilder,
-                   ConnectionTimeout,
-                   MaxClientConnections,
+                   ServerCertificateSelector:   ServerCertificateSelector,
+                   ClientCertificateValidator:  ClientCertificateValidator,
+                   LocalCertificateSelector:    LocalCertificateSelector,
+                   AllowedTLSProtocols:         AllowedTLSProtocols,
+                   ClientCertificateRequired:   ClientCertificateRequired,
+                   CheckCertificateRevocation:  CheckCertificateRevocation,
 
-                   DNSClient,
-                   false)
+                   ConnectionIdBuilder:         ConnectionIdBuilder,
+                   MaxClientConnections:        MaxClientConnections,
+                   DNSClient:                   DNSClient,
 
+                   // false, not AutoStart: the constructor body starts the server itself,
+                   // once its own event handlers are wired up.
+                   AutoStart:                   false)
         {
 
             this.EEBUSAdapter = EEBUSAdapter;
@@ -428,16 +438,24 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
                                                                 CancellationToken          CancellationToken)
         {
 
+            // Hermod assigns Connection.HTTPRequest immediately before it asks any
+            // OnValidateWebSocketConnection handler, so the request is always there by
+            // the time this runs; the property is nullable only because it is filled in
+            // later than the connection is constructed. Captured once, because every
+            // response below is now built from the request it answers - HTTPResponse.Builder
+            // has no parameterless constructor any more.
+            var httpRequest = Connection.HTTPRequest!;
+
             #region Verify 'Sec-WebSocket-Protocol'...
 
-            if (Connection.HTTPRequest?.SecWebSocketProtocol is null ||
-                Connection.HTTPRequest?.SecWebSocketProtocol.Any() == false)
+            if (httpRequest.SecWebSocketProtocol is null ||
+                httpRequest.SecWebSocketProtocol.Any() == false)
             {
 
                 DebugX.Log($"{nameof(AOverlayWebSocketServer)} connection from {Connection.RemoteSocket}: Missing 'Sec-WebSocket-Protocol' HTTP header!");
 
                 return Task.FromResult<HTTPResponse?>(
-                           new HTTPResponse.Builder() {
+                           new HTTPResponse.Builder(httpRequest) {
                                HTTPStatusCode  = HTTPStatusCode.BadRequest,
                                Server          = HTTPServiceName,
                                Date            = Timestamp.Now,
@@ -451,7 +469,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
                            }.AsImmutable);
 
             }
-            else if (!new HashSet<String>(SecWebSocketProtocols).Overlaps(Connection.HTTPRequest?.SecWebSocketProtocol ?? []))
+            else if (!new HashSet<String>(SecWebSocketProtocols).Overlaps(httpRequest.SecWebSocketProtocol ?? []))
             {
 
                 var error = $"This WebSocket service only supports {SecWebSocketProtocols.Select(id => $"'{id}'").AggregateWith(", ")}!";
@@ -459,7 +477,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
                 DebugX.Log($"{nameof(AOverlayWebSocketServer)} connection from {Connection.RemoteSocket}: {error}");
 
                 return Task.FromResult<HTTPResponse?>(
-                           new HTTPResponse.Builder() {
+                           new HTTPResponse.Builder(httpRequest) {
                                HTTPStatusCode  = HTTPStatusCode.BadRequest,
                                Server          = HTTPServiceName,
                                Date            = Timestamp.Now,
@@ -481,7 +499,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
             if (RequireAuthentication)
             {
 
-                if (Connection.HTTPRequest?.Authorization is HTTPBasicAuthentication basicAuthentication)
+                if (httpRequest.Authorization is HTTPBasicAuthentication basicAuthentication)
                 {
 
                     if (NetworkingNodeLogins.TryGetValue(NetworkingNode_Id.Parse(basicAuthentication.Username), out var password) &&
@@ -498,7 +516,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
                     DebugX.Log($"{nameof(AOverlayWebSocketServer)} connection from {Connection.RemoteSocket} missing authorization!");
 
                 return Task.FromResult<HTTPResponse?>(
-                           new HTTPResponse.Builder() {
+                           new HTTPResponse.Builder(httpRequest) {
                                HTTPStatusCode  = HTTPStatusCode.Unauthorized,
                                Server          = HTTPServiceName,
                                Date            = Timestamp.Now,
@@ -757,93 +775,92 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
 
         // Receive data...
 
-        #region (protected) ProcessTextMessage   (RequestTimestamp, ServerConnection, TextMessage,   EventTrackingId, CancellationToken)
+        #region (override) ProcessTextMessage   (RequestTimestamp, Server, Connection, EventTrackingId, TextFrame,   TextMessage,   CancellationToken)
 
         /// <summary>
         /// Process all text messages of this WebSocket API.
         /// </summary>
         /// <param name="RequestTimestamp">The timestamp of the request.</param>
-        /// <param name="ServerConnection">The WebSocket connection.</param>
-        /// <param name="TextMessage">The received text message.</param>
+        /// <param name="Server">The WebSocket endpoint that received the message.</param>
+        /// <param name="Connection">The WebSocket connection.</param>
         /// <param name="EventTrackingId">An optional event tracking identification.</param>
+        /// <param name="TextFrame">The received WebSocket frame.</param>
+        /// <param name="TextMessage">The received text message.</param>
         /// <param name="CancellationToken">The cancellation token.</param>
-        public override async Task<WebSocketTextMessageResponse> ProcessTextMessage(DateTime                   RequestTimestamp,
-                                                                                    WebSocketServerConnection  ServerConnection,
-                                                                                    String                     TextMessage,
-                                                                                    EventTracking_Id           EventTrackingId,
-                                                                                    CancellationToken          CancellationToken)
+        public override async Task ProcessTextMessage(DateTimeOffset             RequestTimestamp,
+                                                      AWebSocketEndpoint         Server,
+                                                      WebSocketServerConnection  Connection,
+                                                      EventTracking_Id           EventTrackingId,
+                                                      WebSocketFrame             TextFrame,
+                                                      String                     TextMessage,
+                                                      CancellationToken          CancellationToken)
         {
 
             // A SHIP node that receives a data frame with another type (0x1)
             // MUST terminate the connection with status code 1003 (unacceptable data).
-            await ServerConnection.Close(
+            await Connection.Close(
                       WebSocketFrame.ClosingStatusCode.UnsupportedData,
                       "HTTP WebSocket Text frames are not allowed by EEBUS SHIP!",
                       CancellationToken
                   );
 
-            return new WebSocketTextMessageResponse(
-                       RequestTimestamp,
-                       TextMessage,
-                       Timestamp.Now,
-                       "",
-                       EventTrackingId,
-                       CancellationToken
-                   );
+            // This used to build and return a WebSocketTextMessageResponse. Hermod's
+            // ProcessTextMessage returns Task and discards whatever a handler produces,
+            // so that object had no reader: closing the connection is the whole answer.
 
         }
 
         #endregion
 
-        #region (protected) ProcessBinaryMessage (RequestTimestamp, ServerConnection, BinaryMessage, EventTrackingId, CancellationToken)
+        #region (override) ProcessBinaryMessage (RequestTimestamp, Server, Connection, EventTrackingId, BinaryFrame, BinaryMessage, CancellationToken)
 
         /// <summary>
-        /// Process all text messages of this WebSocket API.
+        /// Process all binary messages of this WebSocket API.
         /// </summary>
         /// <param name="RequestTimestamp">The timestamp of the request.</param>
+        /// <param name="Server">The WebSocket endpoint that received the message.</param>
         /// <param name="Connection">The WebSocket connection.</param>
-        /// <param name="BinaryMessage">The received binary message.</param>
         /// <param name="EventTrackingId">An optional event tracking identification.</param>
+        /// <param name="BinaryFrame">The received WebSocket frame.</param>
+        /// <param name="BinaryMessage">The received binary message.</param>
         /// <param name="CancellationToken">The cancellation token.</param>
-        public override async Task<WebSocketBinaryMessageResponse> ProcessBinaryMessage(DateTime                   RequestTimestamp,
-                                                                                        WebSocketServerConnection  ServerConnection,
-                                                                                        Byte[]                     BinaryMessage,
-                                                                                        EventTracking_Id           EventTrackingId,
-                                                                                        CancellationToken          CancellationToken)
+        public override async Task ProcessBinaryMessage(DateTimeOffset             RequestTimestamp,
+                                                        AWebSocketEndpoint         Server,
+                                                        WebSocketServerConnection  Connection,
+                                                        EventTracking_Id           EventTrackingId,
+                                                        WebSocketFrame             BinaryFrame,
+                                                        Byte[]                     BinaryMessage,
+                                                        CancellationToken          CancellationToken)
         {
-
-           // BinaryResponseMessage?    EEBUSResponse       = null;
-           // JSONRequestErrorMessage?  EEBUSErrorResponse  = null;
 
             try
             {
 
-                var sourceNodeId = ServerConnection.TryGetCustomDataAs<NetworkingNode_Id>(EEBUS.EEBUSAdapter.NetworkingNodeId_WebSocketKey);
-
                 var binaryMessageResponse = await EEBUSAdapter.IN.ProcessBinaryMessage(
                                                       RequestTimestamp,
-                                                      ServerConnection,
+                                                      Connection,
                                                       BinaryMessage,
                                                       EventTrackingId,
                                                       CancellationToken
                                                   );
 
-                return binaryMessageResponse;
+                // Hermod awaits this method and drops its result, so an answer has to be
+                // put on the connection here instead of being handed back up the stack.
+                if (binaryMessageResponse.ResponseMessage.Length > 0)
+                    await SendBinaryMessage(
+                              Connection,
+                              binaryMessageResponse.ResponseMessage,
+                              CancellationToken: CancellationToken
+                          );
 
             }
             catch (Exception e)
             {
-
-                var EEBUSErrorResponse = JSONRequestErrorMessage.InternalError(
-                                             nameof(SHIPWebSocketServer),
-                                             EventTrackingId,
-                                             BinaryMessage,
-                                             e
-                                         );
-
+                // The former body built a JSONRequestErrorMessage.InternalError here and
+                // then dropped it on the floor - there is no JSON error channel on a SHIP
+                // binary connection to put it on. Logging is what that intent amounts to.
+                DebugX.LogException(e, nameof(SHIPWebSocketServer) + "." + nameof(ProcessBinaryMessage));
             }
-
-            return null;
 
         }
 

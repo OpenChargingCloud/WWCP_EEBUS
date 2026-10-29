@@ -50,7 +50,7 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
         /// <summary>
         /// The default HTTP user agent string.
         /// </summary>
-        public new const String  DefaultHTTPUserAgent   = $"GraphDefined EEBUS/SHIP {EEBUS.Version.String} WebSocket Client";
+        public new const String  DefaultHTTPUserAgent   = $"GraphDefined EEBUS/SHIP {SHIP.Version.String} WebSocket Client";
 
         private    const String  LogfileName            = "NetworkingNodeWSClient.log";
 
@@ -194,40 +194,55 @@ namespace cloud.charging.open.protocols.EEBUS.SHIP
                                    String                                                          LoggingContext               = null, //CPClientLogger.DefaultContext,
                                    LogfileCreatorDelegate?                                         LogfileCreator               = null,
                                    HTTPClientLogger?                                               HTTPLogger                   = null,
-                                   DNSClient?                                                      DNSClient                    = null)
+                                   IDNSClient?                                                     DNSClient                    = null)
 
-            : base(RemoteURL,
-                   VirtualHostname,
-                   Description,
-                   PreferIPv4,
-                   RemoteCertificateValidator,
-                   LocalCertificateSelector,
-                   ClientCertificates,
-                   ClientCertificateContext,
-                   ClientCertificateChain,
-                   TLSProtocol,
-                   HTTPUserAgent ?? DefaultHTTPUserAgent,
-                   HTTPAuthentication,
-                   RequestTimeout,
-                   TransmissionRetryDelay,
-                   MaxNumberOfRetries,
-                   InternalBufferSize,
+            // Named rather than positional - see the note on the SHIPWebSocketServer
+            // constructor. This list had drifted the same way and further: by the time it
+            // was read, a LogfileCreatorDelegate was being offered to a parameter wanting
+            // IEnumerable<SslApplicationProtocol>.
+            : base(URL:                         RemoteURL,
+                   Description:                 Description,
 
-                   [ "ship" ],
+                   VirtualHostname:             VirtualHostname,
+                   HTTPUserAgent:               HTTPUserAgent,
+                   HTTPAuthentication:          HTTPAuthentication,
+                   SecWebSocketProtocols:       [ "ship" ],
+                   RequestTimeout:              RequestTimeout,
 
-                   DisableWebSocketPings,
-                   WebSocketPingEvery,
-                   SlowNetworkSimulationDelay,
+                   DisableWebSocketPings:       DisableWebSocketPings,
+                   WebSocketPingEvery:          WebSocketPingEvery,
+                   SlowNetworkSimulationDelay:  SlowNetworkSimulationDelay,
 
-                   DisableMaintenanceTasks,
-                   MaintenanceEvery,
+                   DisableMaintenanceTasks:     DisableMaintenanceTasks,
+                   MaintenanceEvery:            MaintenanceEvery,
 
-                   LoggingPath,
-                   LoggingContext,
-                   LogfileCreator,
-                   HTTPLogger,
-                   DNSClient)
+                   RemoteCertificateValidator:  RemoteCertificateValidator,
+                   LocalCertificateSelector:    LocalCertificateSelector,
+                   ClientCertificates:          ClientCertificates,
+                   ClientCertificateContext:    ClientCertificateContext,
+                   ClientCertificateChain:      ClientCertificateChain,
+                   TLSProtocols:                TLSProtocol,
 
+                   // Hermod traded the PreferIPv4 flag for a four-way preference. The two
+                   // booleans map onto the two "prefer" members; null stays null, so an
+                   // unset flag keeps whatever default the base has rather than one made
+                   // up here.
+                   IPVersionPreference:         PreferIPv4 switch {
+                                                    true   => (IPVersionPreference?) IPVersionPreference.PreferIPv4,
+                                                    false  =>                        IPVersionPreference.PreferIPv6,
+                                                    _      =>                        null
+                                                },
+
+                   TransmissionRetryDelay:      TransmissionRetryDelay,
+                   MaxNumberOfRetries:          MaxNumberOfRetries,
+                   InternalBufferSize:          InternalBufferSize,
+
+                   LoggingPath:                 LoggingPath,
+                   LoggingContext:              LoggingContext,
+                   LogfileCreator:              LogfileCreator,
+                   HTTPLogger:                  HTTPLogger,
+
+                   DNSClient:                   DNSClient)
         {
 
             this.EEBUSAdapter  = EEBUSAdapter;

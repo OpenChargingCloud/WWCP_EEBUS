@@ -478,14 +478,13 @@ namespace cloud.charging.open.protocols.EEBUS
             }
             catch (Exception e)
             {
-
-                //EEBUSErrorResponse = JSONRequestErrorMessage.InternalError(
-                //                        nameof(EEBUSWebSocketAdapterIN),
-                //                        EventTrackingId,
-                //                        BinaryMessage,
-                //                        e
-                //                    );
-
+                // This caught and then dropped everything: the only use of "e" was the
+                // commented-out block below, so any failure on the incoming path vanished
+                // without trace and the caller got the empty response further down as if
+                // the message had simply said nothing. The JSONRequestErrorMessage it
+                // wanted to build has nowhere to go on a binary connection, so logging is
+                // what that intent reduces to.
+                DebugX.LogException(e, nameof(EEBUSWebSocketAdapterIN) + "." + nameof(ProcessBinaryMessage));
             }
 
 
