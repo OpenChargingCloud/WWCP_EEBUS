@@ -49,9 +49,34 @@ here, because fixing either is a design change with no test to hold it down:
    `SHIPWebSocketClient`/`SHIPWebSocketServer`, which descend from Hermod's
    `WebSocketClient`/`WebSocketServer` instead — unrelated hierarchies, so the filter
    matches nothing whatever is registered. The compiler says exactly this (CS0184, CA2021).
-   The real fix is for the SHIP client and server to descend from
-   `AOverlayWebSocketClient`/`AOverlayWebSocketServer`, which is what a node in this overlay
-   expects to be handed.
+   This was first written down here as "the real fix is for the SHIP client and server to
+   descend from `AOverlayWebSocketClient`/`AOverlayWebSocketServer`". On examination that
+   is wrong, and the correction is the more useful of the two findings, so it replaces the
+   claim openly rather than quietly. Two things stand in the way.
+
+   The two overlay base classes are built oppositely. `AOverlayWebSocketClient` derives
+   from Hermod's `WebSocketClient`, so on the client side the change really would be an
+   insertion into an existing chain. `AOverlayWebSocketServer` derives from nothing but
+   `IEventSender` and *holds* a `WebSocketServer` in a private field, re-exposing its
+   surface. Deriving from it would mean `SHIPWebSocketServer` is no longer a Hermod server
+   at all: every `override`, the `base.OnValidate*` wiring and `SendBinaryMessage` would
+   have to move onto the wrapped instance. That is a rewrite of the TLS and handshake path
+   WP02 and WP05 were built on, not a change of base class.
+
+   And it would not buy what it appears to buy. `Reachability` declares its two properties
+   as `IWebSocketClient?` and `IWebSocketServer?` — the ones in `WWCP.OverlayNetworking`,
+   its own namespace, not Hermod's. **No class in WWCP_Core or in this repository
+   implements either of them**, `AOverlayWebSocketClient` included; and
+   `WWCP.OverlayNetworking.IWebSocketServer` extends Hermod's `IWebSocketServer`, which no
+   Hermod class implements either. Both properties can therefore only ever be null, and
+   the eight `if (reachability.EEBusWebSocket… is not null)` branches in `EEBUSAdapter.cs`
+   are unreachable whatever the SHIP classes descend from.
+
+   So the cause is not in this project. Satisfying those interfaces means implementing
+   `SendJSONRequest`, `SendJSONResponse`, `SendJSONRequestError` and
+   `SendJSONResponseError` on a transport that is binary — which is the design of the
+   EEBUS-to-WWCP bridge, and it commits us to a JSON message shape SHIP does not have.
+   That decision is left open as WP-W2 in WORKPLAN.md of EEBUSConformanceTests.
 
 2. **Four crypto methods on `AEEBUSNode` hide non-virtual base members** (CS0108) and return
    a hard-coded key. A call through the base type gets the base answer; a call through
@@ -73,8 +98,10 @@ repeating itself on every build is the most reliable record of them there is.
 
 ## What happens next
 
-Two things, in this order. The 24 events this project declares and never raises are the
-debris of an adaptation that was abandoned half way; their raise sites are still sitting
-in the code commented out, which is why `CS0067` appears 48 times in a build. And nothing
-here is exercised — the first test against this adapter is worth more than any further
-tidying of it.
+Not the hierarchy change, for the reasons above — that question is WP-W2 and wants a
+decision before any code touches it. What is worth doing without one: the 24 events
+this project declares and never raises are the debris of an adaptation abandoned half
+way, their raise sites still sitting commented out, which is why `CS0067` appears 48
+times in a build. And nothing here is exercised. The first test against this adapter is
+worth more than any further tidying of it, and unlike the bridge it needs nobody’s
+permission.
